@@ -1,86 +1,35 @@
+name: Update Product List from Google Drive
+
 on:
-workflow_dispatch # 允許手動觸發
-schedule:
-- cron: '0 0 * * *' # 每天午夜執行一次 (UTC 時間)
+  workflow_dispatch # 允許手動觸發
+  schedule:
+    - cron: '0 0 * * *' # 每天午夜執行一次 (UTC 時間)
 
 jobs:
-update-products:
-runs-on: ubuntu-latest
-steps:
-- name: Checkout repository
-uses: actions/checkout@v4
+  update-products:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Set up Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-  - name: Install dependencies
-    run: |
-      pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+      - name: Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-  - name: Create Python script
-    run: |
-      echo 'import os'
-      echo 'import json'
-      echo 'from google.oauth2 import service_account'
-      echo 'from googleapiclient.discovery import build'
-      echo ''
-      echo 'creds_json = os.environ.get("GOOGLE_CREDENTIALS" )'
-      echo 'if not creds_json:'
-      echo '    raise ValueError("GOOGLE_CREDENTIALS environment variable not set.")'
-      echo ''
-      echo 'creds_info = json.loads(creds_json)'
-      echo ''
-      echo 'SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]'
-      echo ''
-      echo 'creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES )'
-      echo ''
-      echo 'service = build("drive", "v3", credentials=creds)'
-      echo ''
-      echo 'FOLDER_ID = "1GPHOg02T2ABewVAtFgIUiSBeiwmqgGK6" # <-- 請替換為您的 Google Drive 資料夾 ID'
-      echo ''
-      echo 'products = []'
-      echo 'page_token = None'
-      echo ''
-      echo 'while True:'
-      echo '    results = service.files().list('\n          echo '        q=f"\'{FOLDER_ID}\' in parents and mimeType contains \'image/\' and trashed = false",'\n          echo '        fields="nextPageToken, files(id, name)",'\n          echo '        pageSize=100,'\n          echo '        pageToken=page_token'\n          echo '    ).execute()'
-      echo '    '
-      echo '    items = results.get("files", [])'
-      echo ''
-      echo '    for item in items:'
-      echo '        file_name = item["name"]'
-      echo '        file_id = item["id"]'
-      echo '        # 提取檔名前綴：只保留「字母+數字」部分'
-      echo '        def extract_product_code(filename):'
-      echo '            match = re.match(r"^([A-Za-z]+\\d+)", filename)'
-      echo '            return match.group(1) if match else filename'
-      echo '        '
-      echo '        if file_name.lower().endswith((\".png\", \".jpg\", \".jpeg\", \".gif\", \".bmp\", \".webp\")):'
-      echo '            products.append({\'
-      echo '                "name": extract_product_code(file_name),\'
-      echo '                "id": file_id\'
-      echo '            })
-      echo '    '
-      echo '    page_token = results.get("nextPageToken", None)'
-      echo '    if not page_token:'
-      echo '        break'
-      echo ''
-      echo 'with open("products.json", "w", encoding="utf-8") as f:'
-      echo '    json.dump(products, f, ensure_ascii=False, indent=2)'
-      echo ''
-      echo 'print(f"Successfully updated products.json with {len(products)} items.")' > update_products.py
+      - name: Run Python script to update products.json
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: python update_products.py
 
-  - name: Run Python script to update products.json
-    env:
-      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-    run: python update_products.py
-
-  - name: Commit and push changes
-    run: |
-      git config user.name "github-actions[bot]"
-      git config user.email "github-actions[bot]@users.noreply.github.com"
-      git add products.json
-      git diff --quiet --exit-code || git commit -m "Auto-update products.json from Google Drive"
-      git push
-```
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add products.json
+          git diff --quiet --exit-code || git commit -m "Auto-update products.json from Google Drive"
+          git push
